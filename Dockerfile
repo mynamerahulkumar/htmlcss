@@ -6,7 +6,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    UV_CACHE_DIR=/opt/uv-cache
+    PORT=8080 \
+    FLASK_ENV=production
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -32,22 +33,11 @@ COPY . .
 # Create necessary directories
 RUN mkdir -p backend/static backend/templates
 
-# Set the port that Google App Engine expects
-ENV PORT=8080
-
 # Expose the port
 EXPOSE 8080
 
-# Create a startup script for App Engine
-RUN echo '#!/bin/bash\n\
-# Set environment variables for App Engine\n\
-export FLASK_APP=backend/app.py\n\
-export FLASK_ENV=production\n\
-export PYTHONPATH=/app\n\
-\n\
-# Start the application using production launcher\n\
-cd /app && python main_production.py\n\
-' > /app/start.sh && chmod +x /app/start.sh
+# Set Python path
+ENV PYTHONPATH=/app
 
-# Use the startup script
-CMD ["/app/start.sh"]
+# Start the application directly
+CMD ["python", "main_production.py"]

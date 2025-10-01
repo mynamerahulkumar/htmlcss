@@ -46,9 +46,11 @@ def main():
         
         # Get port from environment
         port = int(os.environ.get('PORT', 8080))
-        host = '0.0.0.0'  # App Engine requires binding to all interfaces
+        host = '0.0.0.0'  # Cloud Run requires binding to all interfaces
         
         logger.info(f"🌐 Starting web application on {host}:{port}")
+        logger.info(f"🔧 Environment: {os.environ.get('FLASK_ENV', 'development')}")
+        logger.info(f"📁 Python path: {sys.path}")
         logger.info("📊 Trading bot dashboard is ready")
         
         # Run the application
@@ -58,14 +60,19 @@ def main():
             port=port,
             debug=False,
             use_reloader=False,
-            log_output=True
+            log_output=True,
+            allow_unsafe_werkzeug=True
         )
         
     except ImportError as e:
         logger.error(f"❌ Failed to import application: {e}")
+        logger.error(f"📁 Current working directory: {os.getcwd()}")
+        logger.error(f"📁 Files in current directory: {os.listdir('.')}")
         sys.exit(1)
     except Exception as e:
         logger.error(f"❌ Failed to start application: {e}")
+        import traceback
+        logger.error(f"📋 Traceback: {traceback.format_exc()}")
         sys.exit(1)
 
 if __name__ == "__main__":

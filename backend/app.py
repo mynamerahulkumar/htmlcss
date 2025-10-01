@@ -373,6 +373,15 @@ def index():
     """Serve the main trading dashboard"""
     return render_template('index.html')
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Cloud Run"""
+    return jsonify({
+        'status': 'healthy',
+        'service': 'Delta Exchange Trading Bot',
+        'timestamp': datetime.now().isoformat()
+    }), 200
+
 @app.route('/api/status')
 def get_status():
     """Get current bot status"""
@@ -724,4 +733,6 @@ if __name__ == '__main__':
     load_config_from_file()
     
     # Run the Flask app with SocketIO
-    socketio.run(app, debug=True, host='0.0.0.0', port=5003, allow_unsafe_werkzeug=True)
+    port = int(os.environ.get('PORT', 5003))
+    debug_mode = os.environ.get('FLASK_ENV', 'development') == 'development'
+    socketio.run(app, debug=debug_mode, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
