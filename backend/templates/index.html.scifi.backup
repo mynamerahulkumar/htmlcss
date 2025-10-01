@@ -1,0 +1,1818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delta Exchange Trading Bot</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Orbitron', monospace;
+            background: #0a0a0a;
+            background-image: 
+                radial-gradient(circle at 20% 80%, rgba(0, 255, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 20%, rgba(255, 0, 255, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 40%, rgba(0, 255, 0, 0.05) 0%, transparent 50%);
+            min-height: 100vh;
+            color: #00ff00;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Animated background particles */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(90deg, transparent 98%, rgba(0, 255, 255, 0.03) 100%),
+                linear-gradient(0deg, transparent 98%, rgba(0, 255, 255, 0.03) 100%);
+            background-size: 50px 50px;
+            animation: matrixMove 20s linear infinite;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        @keyframes matrixMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 12px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 20, 40, 0.8);
+            border-radius: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(45deg, #00ffff, #00ff00);
+            border-radius: 6px;
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(45deg, #00ff00, #00ffff);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.7);
+        }
+
+        /* Enhanced text selection */
+        ::selection {
+            background: rgba(0, 255, 255, 0.3);
+            color: #00ff00;
+        }
+
+        ::-moz-selection {
+            background: rgba(0, 255, 255, 0.3);
+            color: #00ff00;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #00ffff;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            font-weight: 900;
+            text-shadow: 
+                0 0 10px #00ffff,
+                0 0 20px #00ffff,
+                0 0 30px #00ffff,
+                0 0 40px #00ffff;
+            animation: glow 2s ease-in-out infinite alternate;
+            letter-spacing: 3px;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.8;
+            color: #00ff00;
+            font-family: 'Share Tech Mono', monospace;
+            text-shadow: 0 0 5px #00ff00;
+        }
+
+        @keyframes glow {
+            from {
+                text-shadow: 
+                    0 0 10px #00ffff,
+                    0 0 20px #00ffff,
+                    0 0 30px #00ffff,
+                    0 0 40px #00ffff;
+            }
+            to {
+                text-shadow: 
+                    0 0 20px #00ffff,
+                    0 0 30px #00ffff,
+                    0 0 40px #00ffff,
+                    0 0 50px #00ffff,
+                    0 0 60px #00ffff;
+            }
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: rgba(0, 20, 40, 0.8);
+            border: 1px solid #00ffff;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 
+                0 0 20px rgba(0, 255, 255, 0.3),
+                inset 0 0 20px rgba(0, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            backdrop-filter: blur(10px);
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 15px;
+            padding: 1px;
+            background: linear-gradient(45deg, #00ffff, #ff00ff, #00ff00, #ffff00);
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            mask-composite: exclude;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 
+                0 0 30px rgba(0, 255, 255, 0.5),
+                inset 0 0 30px rgba(0, 255, 255, 0.2);
+        }
+
+        .card:hover::before {
+            opacity: 1;
+        }
+
+        .card h3 {
+            color: #00ffff;
+            margin-bottom: 15px;
+            font-size: 1.4rem;
+            border-bottom: 2px solid #00ffff;
+            padding-bottom: 10px;
+            text-shadow: 0 0 10px #00ffff;
+            font-weight: 700;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .status-card {
+            background: rgba(0, 15, 30, 0.9);
+            border: 1px solid #00ff00;
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 
+                0 0 15px rgba(0, 255, 0, 0.3),
+                inset 0 0 15px rgba(0, 255, 0, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .status-card::before {
+            content: '';
+            position: absolute;
+            top: -1px;
+            left: -1px;
+            right: -1px;
+            bottom: -1px;
+            border-radius: 15px;
+            background: linear-gradient(45deg, #00ff00, #00ffff, #ff00ff);
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .status-card:hover::before {
+            opacity: 1;
+        }
+
+        .status-value {
+            font-size: 2.2rem;
+            font-weight: bold;
+            margin: 10px 0;
+            text-shadow: 0 0 10px currentColor;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .status-label {
+            color: #00ff00;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-family: 'Share Tech Mono', monospace;
+            text-shadow: 0 0 5px #00ff00;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .running { 
+            color: #00ff00; 
+            text-shadow: 0 0 15px #00ff00;
+        }
+        .stopped { 
+            color: #ff0040; 
+            text-shadow: 0 0 15px #ff0040;
+        }
+        .neutral { 
+            color: #00ffff; 
+            text-shadow: 0 0 15px #00ffff;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #00ffff;
+            text-shadow: 0 0 5px #00ffff;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #00ffff;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: rgba(0, 20, 40, 0.8);
+            color: #00ff00;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #00ff00;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+            background: rgba(0, 30, 60, 0.9);
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #00ffff 0%, #0080ff 100%);
+            color: #000;
+            border: 1px solid #00ffff;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-family: 'Orbitron', monospace;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 
+                0 5px 15px rgba(0, 255, 255, 0.4),
+                0 0 20px rgba(0, 255, 255, 0.6);
+            text-shadow: 0 0 10px #000;
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+            background: linear-gradient(135deg, #333 0%, #666 100%);
+            border-color: #666;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ff0040 0%, #ff4080 100%);
+            border-color: #ff0040;
+        }
+
+        .btn-danger:hover {
+            box-shadow: 
+                0 5px 15px rgba(255, 0, 64, 0.4),
+                0 0 20px rgba(255, 0, 64, 0.6);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #00ff00 0%, #40ff40 100%);
+            border-color: #00ff00;
+        }
+
+        .btn-success:hover {
+            box-shadow: 
+                0 5px 15px rgba(0, 255, 0, 0.4),
+                0 0 20px rgba(0, 255, 0, 0.6);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, #ffff00 0%, #ffaa00 100%);
+            border-color: #ffff00;
+            color: #000;
+        }
+
+        .btn-warning:hover {
+            box-shadow: 
+                0 5px 15px rgba(255, 255, 0, 0.4),
+                0 0 20px rgba(255, 255, 0, 0.6);
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .log {
+            background: #000;
+            color: #00ff00;
+            padding: 20px;
+            border-radius: 10px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            border: 1px solid #00ff00;
+            box-shadow: 
+                0 0 20px rgba(0, 255, 0, 0.3),
+                inset 0 0 20px rgba(0, 255, 0, 0.1);
+            position: relative;
+        }
+
+        .log::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #00ff00, transparent);
+            animation: scanLine 3s linear infinite;
+        }
+
+        @keyframes scanLine {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+
+        .log-info { 
+            color: #00ffff; 
+            text-shadow: 0 0 5px #00ffff;
+        }
+        .log-success { 
+            color: #00ff00; 
+            text-shadow: 0 0 5px #00ff00;
+        }
+        .log-warning { 
+            color: #ffff00; 
+            text-shadow: 0 0 5px #ffff00;
+        }
+        .log-error { 
+            color: #ff0040; 
+            text-shadow: 0 0 5px #ff0040;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-top: 20px;
+            background: rgba(0, 20, 40, 0.8);
+            border: 1px solid #00ffff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 
+                0 0 20px rgba(0, 255, 255, 0.3),
+                inset 0 0 20px rgba(0, 255, 255, 0.1);
+        }
+
+        .signal-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            box-shadow: 0 0 10px currentColor;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        .signal-buy { 
+            background-color: #00ff00; 
+            box-shadow: 0 0 15px #00ff00;
+        }
+        .signal-sell { 
+            background-color: #ff0040; 
+            box-shadow: 0 0 15px #ff0040;
+        }
+        .signal-neutral { 
+            background-color: #00ffff; 
+            box-shadow: 0 0 15px #00ffff;
+        }
+
+        .position-info {
+            background: rgba(0, 20, 40, 0.8);
+            border: 1px solid #00ffff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            box-shadow: 
+                0 0 15px rgba(0, 255, 255, 0.3),
+                inset 0 0 15px rgba(0, 255, 255, 0.1);
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: 500;
+        }
+
+        .alert-success {
+            background-color: #c6f6d5;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+
+        .alert-error {
+            background-color: #fed7d7;
+            color: #742a2a;
+            border: 1px solid #feb2b2;
+        }
+
+        .alert-info {
+            background-color: #bee3f8;
+            color: #2a4365;
+            border: 1px solid #90cdf4;
+        }
+
+        .news-controls {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .news-status {
+            font-weight: 600;
+            padding: 8px 12px;
+            border-radius: 6px;
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+        }
+
+        .news-recommendation {
+            background: rgba(0, 20, 40, 0.8);
+            border: 1px solid #00ffff;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid #00ffff;
+            box-shadow: 
+                0 0 15px rgba(0, 255, 255, 0.3),
+                inset 0 0 15px rgba(0, 255, 255, 0.1);
+        }
+
+        .recommendation-box {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin: 10px 0;
+        }
+
+        .recommendation-signal {
+            font-size: 1.5rem;
+            font-weight: bold;
+            padding: 8px 16px;
+            border-radius: 8px;
+            color: white;
+        }
+
+        .recommendation-signal.buy {
+            background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        }
+
+        .recommendation-signal.sell {
+            background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+        }
+
+        .recommendation-signal.hold {
+            background: linear-gradient(135deg, #a0aec0 0%, #718096 100%);
+        }
+
+        .recommendation-confidence {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #4a5568;
+        }
+
+        .recommendation-reason {
+            color: #718096;
+            font-style: italic;
+        }
+
+        .news-list, .signals-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .news-item, .signal-item {
+            background: rgba(0, 15, 30, 0.8);
+            border: 1px solid #00ffff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 
+                0 0 10px rgba(0, 255, 255, 0.2),
+                inset 0 0 10px rgba(0, 255, 255, 0.05);
+        }
+
+        .news-item:hover, .signal-item:hover {
+            background: rgba(0, 25, 50, 0.9);
+            border-color: #00ff00;
+            box-shadow: 
+                0 0 20px rgba(0, 255, 0, 0.4),
+                inset 0 0 20px rgba(0, 255, 0, 0.1);
+        }
+
+        .news-title {
+            font-weight: 600;
+            color: #00ffff;
+            margin-bottom: 8px;
+            line-height: 1.4;
+            text-shadow: 0 0 5px #00ffff;
+        }
+
+        .news-source {
+            font-size: 0.85rem;
+            color: #00ff00;
+            margin-bottom: 5px;
+            text-shadow: 0 0 3px #00ff00;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .news-content {
+            color: #00ff00;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            margin-bottom: 10px;
+            text-shadow: 0 0 3px #00ff00;
+        }
+
+        .news-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            color: #00ffff;
+            text-shadow: 0 0 3px #00ffff;
+        }
+
+        .signal-confidence {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: white;
+        }
+
+        .confidence-high { background: #48bb78; }
+        .confidence-medium { background: #ed8936; }
+        .confidence-low { background: #a0aec0; }
+
+        .signal-tags {
+            margin-top: 8px;
+        }
+
+        .signal-tag {
+            display: inline-block;
+            background: #e2e8f0;
+            color: #4a5568;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.75rem;
+            margin-right: 5px;
+            margin-bottom: 3px;
+        }
+
+        .signal-tag.bullish { background: #c6f6d5; color: #22543d; }
+        .signal-tag.bearish { background: #fed7d7; color: #742a2a; }
+        .signal-tag.high-impact { background: #bee3f8; color: #2a4365; }
+
+        .no-news, .no-signals {
+            text-align: center;
+            color: #a0aec0;
+            font-style: italic;
+            padding: 40px 20px;
+        }
+
+        .news-refresh {
+            font-size: 0.8rem;
+            color: #a0aec0;
+            text-align: right;
+            margin-top: 10px;
+        }
+
+        /* Configuration Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: rgba(0, 20, 40, 0.95);
+            border: 1px solid #00ffff;
+            margin: 5% auto;
+            padding: 0;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 
+                0 20px 60px rgba(0, 0, 0, 0.8),
+                0 0 50px rgba(0, 255, 255, 0.3);
+            animation: modalSlideIn 0.3s ease-out;
+            backdrop-filter: blur(10px);
+        }
+
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, #00ffff 0%, #0080ff 100%);
+            color: #000;
+            padding: 20px 30px;
+            border-radius: 15px 15px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        }
+
+        .modal-header h2 {
+            margin: 0;
+            font-size: 1.5rem;
+        }
+
+        .close {
+            color: #000;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-shadow: 0 0 10px #000;
+        }
+
+        .close:hover {
+            opacity: 0.7;
+            text-shadow: 0 0 20px #000;
+        }
+
+        .modal-body {
+            padding: 30px;
+        }
+
+        .config-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(0, 15, 30, 0.8);
+            border-radius: 10px;
+            border-left: 4px solid #00ffff;
+            border: 1px solid #00ffff;
+            box-shadow: 
+                0 0 15px rgba(0, 255, 255, 0.2),
+                inset 0 0 15px rgba(0, 255, 255, 0.05);
+        }
+
+        .config-section h3 {
+            color: #00ffff;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+            text-shadow: 0 0 10px #00ffff;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .config-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .config-item label {
+            font-weight: 600;
+            color: #00ffff;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            text-shadow: 0 0 5px #00ffff;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .config-item input, .config-item select {
+            padding: 10px;
+            border: 2px solid #00ffff;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            transition: all 0.3s ease;
+            background: rgba(0, 20, 40, 0.8);
+            color: #00ff00;
+            font-family: 'Share Tech Mono', monospace;
+        }
+
+        .config-item input:focus, .config-item select:focus {
+            outline: none;
+            border-color: #00ff00;
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.5);
+            background: rgba(0, 30, 60, 0.9);
+        }
+
+        .config-item small {
+            color: #00ff00;
+            font-size: 0.8rem;
+            margin-top: 4px;
+            text-shadow: 0 0 3px #00ff00;
+        }
+
+        .modal-footer {
+            padding: 20px 30px;
+            background: rgba(0, 15, 30, 0.9);
+            border-radius: 0 0 15px 15px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 15px;
+            border-top: 1px solid #00ffff;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #666 0%, #999 100%);
+            color: #000;
+            border: 1px solid #666;
+            padding: 10px 20px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(102, 102, 102, 0.4);
+        }
+
+        .config-status {
+            padding: 10px 15px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-weight: 500;
+            display: none;
+        }
+
+        .config-status.success {
+            background-color: #c6f6d5;
+            color: #22543d;
+            border: 1px solid #9ae6b4;
+        }
+
+        .config-status.error {
+            background-color: #fed7d7;
+            color: #742a2a;
+            border: 1px solid #feb2b2;
+        }
+
+        @media (max-width: 768px) {
+            .dashboard {
+                grid-template-columns: 1fr;
+            }
+            
+            .status-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .news-controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .recommendation-box {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 10% auto;
+            }
+
+            .config-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .modal-footer {
+                flex-direction: column;
+            }
+        }
+
+        /* Tooltip styles */
+        .btn[title] {
+            position: relative;
+        }
+
+        .btn[title]:hover::after {
+            content: attr(title);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #2d3748;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            white-space: nowrap;
+            z-index: 1000;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 5px;
+        }
+
+        .btn[title]:hover::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 5px solid transparent;
+            border-top-color: #2d3748;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 DELTA EXCHANGE TRADING BOT</h1>
+            <p>NEURAL NETWORK AUTOMATED TRADING SYSTEM</p>
+            <div style="margin-top: 20px;">
+                <div style="display: inline-block; margin: 0 10px; padding: 5px 15px; background: rgba(0, 255, 255, 0.2); border: 1px solid #00ffff; border-radius: 20px; font-size: 0.8rem; color: #00ffff; text-shadow: 0 0 5px #00ffff;">STATUS: ONLINE</div>
+                <div style="display: inline-block; margin: 0 10px; padding: 5px 15px; background: rgba(0, 255, 0, 0.2); border: 1px solid #00ff00; border-radius: 20px; font-size: 0.8rem; color: #00ff00; text-shadow: 0 0 5px #00ff00;">AI: ACTIVE</div>
+            </div>
+            <button class="btn btn-warning" onclick="openConfigModal()" style="margin-top: 15px;" title="Open configuration settings to set up API credentials, trading parameters, and bot preferences">⚙️ SYSTEM CONFIGURATION</button>
+        </div>
+
+        <div class="status-grid">
+            <div class="status-card">
+                <div class="status-label">NEURAL STATUS</div>
+                <div class="status-value" id="botStatus">OFFLINE</div>
+            </div>
+            <div class="status-card">
+                <div class="status-label">QUANTUM PRICE</div>
+                <div class="status-value" id="currentPrice">$0.00</div>
+            </div>
+            <div class="status-card">
+                <div class="status-label">POSITION MATRIX</div>
+                <div class="status-value" id="position">NONE</div>
+            </div>
+            <div class="status-card">
+                <div class="status-label">PROFIT/LOSS</div>
+                <div class="status-value" id="pnl">$0.00</div>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card">
+                <h3>🤖 NEURAL BOT CONTROL</h3>
+                <div class="controls">
+                    <button class="btn btn-success" id="startBtn" onclick="startBot()" title="Activate the neural trading bot using configured API credentials and trading parameters">ACTIVATE NEURAL BOT</button>
+                    <button class="btn btn-danger" id="stopBtn" onclick="stopBot()" disabled title="Deactivate the currently running trading bot and close any open positions">DEACTIVATE BOT</button>
+                    <button class="btn btn-success" id="startNewsBtn" onclick="startNews()" title="Activate the neural news processor to monitor crypto news and generate trading signals">ACTIVATE NEWS AI</button>
+                    <button class="btn btn-danger" id="stopNewsBtn" onclick="stopNews()" disabled title="Deactivate the news analysis service">DEACTIVATE NEWS AI</button>
+                </div>
+                <div class="config-note">
+                    <small>💡 INITIALIZE NEURAL ACCESS CREDENTIALS IN SYSTEM CONFIGURATION (⚙️) BEFORE ACTIVATION</small>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>📊 QUANTUM SIGNAL ANALYSIS</h3>
+                <div id="signalsInfo">
+                    <p><span class="signal-indicator signal-neutral"></span>SMA Signal: <span id="smaSignal">None</span></p>
+                    <p><span class="signal-indicator signal-neutral"></span>EMA Signal: <span id="emaSignal">None</span></p>
+                    <p>SMA Short (9): <span id="smaShort">-</span></p>
+                    <p>SMA Long (10): <span id="smaLong">-</span></p>
+                    <p>EMA Short (9): <span id="emaShort">-</span></p>
+                    <p>EMA Long (10): <span id="emaLong">-</span></p>
+                </div>
+                
+                <div class="position-info" id="positionInfo" style="display: none;">
+                    <h4>Current Position</h4>
+                    <p>Side: <span id="positionSide">-</span></p>
+                    <p>Size: <span id="positionSize">-</span></p>
+                    <p>Entry Price: <span id="entryPrice">-</span></p>
+                    <p>Realized P&L: <span id="realizedPnl">-</span></p>
+                    <p>Unrealized P&L: <span id="unrealizedPnl">-</span></p>
+                    <p><strong>Total P&L: <span id="totalPnl">-</span></strong></p>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card">
+                <h3>📰 NEURAL NEWS PROCESSOR</h3>
+                <div class="news-controls">
+                    <button class="btn btn-success" onclick="startNews()" title="Activate the neural news processor to monitor crypto news and analyze market sentiment">ACTIVATE NEWS AI</button>
+                    <button class="btn btn-danger" onclick="stopNews()" title="Deactivate the news monitoring and sentiment analysis service">DEACTIVATE NEWS AI</button>
+                    <span class="news-status" id="newsStatus">NEURAL NEWS PROCESSOR: OFFLINE</span>
+                </div>
+                
+                <div class="news-recommendation" id="newsRecommendation" style="display: none;">
+                    <h4>NEURAL MARKET ANALYSIS</h4>
+                    <div class="recommendation-box">
+                        <span class="recommendation-signal" id="recommendationSignal">HOLD</span>
+                        <span class="recommendation-confidence" id="recommendationConfidence">50%</span>
+                    </div>
+                    <p class="recommendation-reason" id="recommendationReason">AWAITING NEURAL PROCESSING...</p>
+                </div>
+                
+                <div class="news-list" id="newsList">
+                    <p class="no-news">ACTIVATE NEURAL NEWS PROCESSOR TO ACCESS MARKET DATA STREAMS...</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>🎯 AI PREDICTION ENGINE</h3>
+                <div class="signals-list" id="signalsList">
+                    <p class="no-signals">AI PREDICTION ENGINE STANDBY... ACTIVATE NEWS PROCESSOR FOR NEURAL ANALYSIS</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card">
+                <h3>🎯 MANUAL OVERRIDE</h3>
+                <div class="controls">
+                    <button class="btn btn-success" onclick="manualTrade('buy')" title="Manually place a buy order for the configured trading symbol">EXECUTE BUY</button>
+                    <button class="btn btn-danger" onclick="manualTrade('sell')" title="Manually place a sell order for the configured trading symbol">EXECUTE SELL</button>
+                    <button class="btn btn-warning" onclick="closePosition()" title="Close any open trading position immediately">EMERGENCY CLOSE</button>
+                </div>
+                <div id="manualTradeAlert"></div>
+            </div>
+
+            <div class="card">
+                <h3>📈 QUANTUM PRICE MATRIX</h3>
+                <div class="chart-container">
+                    <canvas id="priceChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>📝 NEURAL ACTIVITY LOG</h3>
+            <div class="log" id="tradingLog">
+                <div class="log-entry log-info">NEURAL SYSTEM INITIALIZED... AWAITING CONFIGURATION</div>
+                <div class="log-entry log-info">QUANTUM ALGORITHMS LOADED... READY FOR TRADING</div>
+                <div class="log-entry log-info">AI PREDICTION ENGINE STANDBY... CONFIGURE CREDENTIALS TO ACTIVATE</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Configuration Modal -->
+    <div id="configModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>⚙️ NEURAL SYSTEM CONFIGURATION</h2>
+                <span class="close" onclick="closeConfigModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="configStatus" class="config-status"></div>
+                
+                <form id="configForm">
+                    <!-- API Credentials Configuration -->
+                    <div class="config-section">
+                        <h3>🔑 NEURAL ACCESS CREDENTIALS</h3>
+                        <div class="config-grid">
+                            <div class="config-item">
+                                <label for="apiKey">API Key</label>
+                                <input type="password" id="apiKey" name="api_key" placeholder="Enter your Delta Exchange API key">
+                                <small>Your Delta Exchange API key for trading</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="apiSecret">API Secret</label>
+                                <input type="password" id="apiSecret" name="api_secret" placeholder="Enter your Delta Exchange API secret">
+                                <small>Your Delta Exchange API secret for trading</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="tradingSymbol">Trading Symbol</label>
+                                <input type="text" id="tradingSymbol" name="trading_symbol" value="BTCUSD" placeholder="BTCUSD">
+                                <small>Trading pair symbol (e.g., BTCUSD, ETHUSD)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Trading Strategy Configuration -->
+                    <div class="config-section">
+                        <h3>📊 QUANTUM ALGORITHM PARAMETERS</h3>
+                        <div class="config-grid">
+                            <div class="config-item">
+                                <label for="smaShortPeriod">SMA Short Period</label>
+                                <input type="number" id="smaShortPeriod" name="sma_short_period" min="1" max="50" value="9">
+                                <small>Short-term Simple Moving Average period (default: 9)</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="smaLongPeriod">SMA Long Period</label>
+                                <input type="number" id="smaLongPeriod" name="sma_long_period" min="1" max="200" value="21">
+                                <small>Long-term Simple Moving Average period (default: 21)</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="emaShortPeriod">EMA Short Period</label>
+                                <input type="number" id="emaShortPeriod" name="ema_short_period" min="1" max="50" value="9">
+                                <small>Short-term Exponential Moving Average period (default: 9)</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="emaLongPeriod">EMA Long Period</label>
+                                <input type="number" id="emaLongPeriod" name="ema_long_period" min="1" max="200" value="21">
+                                <small>Long-term Exponential Moving Average period (default: 21)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Risk Management Configuration -->
+                    <div class="config-section">
+                        <h3>🛡️ NEURAL SAFETY PROTOCOLS</h3>
+                        <div class="config-grid">
+                            <div class="config-item">
+                                <label for="positionSize">Position Size</label>
+                                <input type="number" id="positionSize" name="position_size" min="0.01" max="100" step="0.01" value="1">
+                                <small>Default position size for trades (default: 1)</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="stopLossPercent">Stop Loss (%)</label>
+                                <input type="number" id="stopLossPercent" name="stop_loss_percent" min="0.1" max="50" step="0.1" value="2">
+                                <small>Stop loss percentage (default: 2%)</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="takeProfitPercent">Take Profit (%)</label>
+                                <input type="number" id="takeProfitPercent" name="take_profit_percent" min="0.1" max="100" step="0.1" value="4">
+                                <small>Take profit percentage (default: 4%)</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="maxDailyTrades">Max Daily Trades</label>
+                                <input type="number" id="maxDailyTrades" name="max_daily_trades" min="1" max="100" value="10">
+                                <small>Maximum trades per day (default: 10)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- News Analysis Configuration -->
+                    <div class="config-section">
+                        <h3>📰 NEURAL NEWS PROCESSOR</h3>
+                        <div class="config-grid">
+                            <div class="config-item">
+                                <label for="newsConfidenceThreshold">News Confidence Threshold</label>
+                                <input type="number" id="newsConfidenceThreshold" name="news_confidence_threshold" min="0.1" max="1" step="0.1" value="0.7">
+                                <small>Minimum confidence for news-based signals (default: 0.7)</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="newsUpdateInterval">News Update Interval (minutes)</label>
+                                <input type="number" id="newsUpdateInterval" name="news_update_interval" min="1" max="60" value="5">
+                                <small>How often to fetch news (default: 5 minutes)</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="enableNewsTrading">Enable News Trading</label>
+                                <select id="enableNewsTrading" name="enable_news_trading">
+                                    <option value="true">Enabled</option>
+                                    <option value="false">Disabled</option>
+                                </select>
+                                <small>Use news sentiment in trading decisions</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="newsWeight">News Signal Weight</label>
+                                <input type="number" id="newsWeight" name="news_weight" min="0" max="1" step="0.1" value="0.3">
+                                <small>Weight of news signals vs technical signals (default: 0.3)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Trading Schedule Configuration -->
+                    <div class="config-section">
+                        <h3>⏰ NEURAL OPERATION SCHEDULE</h3>
+                        <div class="config-grid">
+                            <div class="config-item">
+                                <label for="tradingStartTime">Trading Start Time</label>
+                                <input type="time" id="tradingStartTime" name="trading_start_time" value="09:00">
+                                <small>When to start trading (24-hour format)</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="tradingEndTime">Trading End Time</label>
+                                <input type="time" id="tradingEndTime" name="trading_end_time" value="17:00">
+                                <small>When to stop trading (24-hour format)</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="enableWeekendTrading">Weekend Trading</label>
+                                <select id="enableWeekendTrading" name="enable_weekend_trading">
+                                    <option value="false">Disabled</option>
+                                    <option value="true">Enabled</option>
+                                </select>
+                                <small>Allow trading on weekends</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="tradingInterval">Trading Check Interval (seconds)</label>
+                                <input type="number" id="tradingInterval" name="trading_interval" min="5" max="300" value="10">
+                                <small>How often to check for signals (default: 10 seconds)</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Configuration -->
+                    <div class="config-section">
+                        <h3>🔧 NEURAL ADVANCED PROTOCOLS</h3>
+                        <div class="config-grid">
+                            <div class="config-item">
+                                <label for="apiTimeout">API Timeout (seconds)</label>
+                                <input type="number" id="apiTimeout" name="api_timeout" min="5" max="60" value="30">
+                                <small>API request timeout (default: 30 seconds)</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="maxRetries">Max API Retries</label>
+                                <input type="number" id="maxRetries" name="max_retries" min="1" max="10" value="3">
+                                <small>Maximum API retry attempts (default: 3)</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="logLevel">Log Level</label>
+                                <select id="logLevel" name="log_level">
+                                    <option value="DEBUG">Debug</option>
+                                    <option value="INFO" selected>Info</option>
+                                    <option value="WARNING">Warning</option>
+                                    <option value="ERROR">Error</option>
+                                </select>
+                                <small>Logging verbosity level</small>
+                            </div>
+                            <div class="config-item">
+                                <label for="enablePaperTrading">Paper Trading Mode</label>
+                                <select id="enablePaperTrading" name="enable_paper_trading">
+                                    <option value="false">Live Trading</option>
+                                    <option value="true">Paper Trading</option>
+                                </select>
+                                <small>Simulate trades without real money</small>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="closeConfigModal()" title="Close the configuration modal without saving changes">ABORT</button>
+                <button type="button" class="btn btn-warning" onclick="resetConfig()" title="Reset all configuration settings to their default values">RESET TO DEFAULTS</button>
+                <button type="button" class="btn btn-success" onclick="saveConfig()" title="Save all configuration changes and apply them to the trading bot">SAVE CONFIGURATION</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration Modal Functions
+        function openConfigModal() {
+            document.getElementById('configModal').style.display = 'block';
+            loadConfig();
+        }
+
+        function closeConfigModal() {
+            document.getElementById('configModal').style.display = 'none';
+            hideConfigStatus();
+        }
+
+        function hideConfigStatus() {
+            const statusDiv = document.getElementById('configStatus');
+            statusDiv.style.display = 'none';
+            statusDiv.className = 'config-status';
+        }
+
+        function showConfigStatus(message, type) {
+            const statusDiv = document.getElementById('configStatus');
+            statusDiv.textContent = message;
+            statusDiv.className = `config-status ${type}`;
+            statusDiv.style.display = 'block';
+            
+            if (type === 'success') {
+                setTimeout(() => {
+                    hideConfigStatus();
+                }, 3000);
+            }
+        }
+
+        function loadConfig() {
+            fetch('/api/config')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const config = data.config;
+                        
+                        // Load form values
+                        document.getElementById('apiKey').value = config.api_key || '';
+                        document.getElementById('apiSecret').value = config.api_secret || '';
+                        document.getElementById('tradingSymbol').value = config.trading_symbol || 'BTCUSD';
+                        document.getElementById('smaShortPeriod').value = config.sma_short_period || 9;
+                        document.getElementById('smaLongPeriod').value = config.sma_long_period || 21;
+                        document.getElementById('emaShortPeriod').value = config.ema_short_period || 9;
+                        document.getElementById('emaLongPeriod').value = config.ema_long_period || 21;
+                        document.getElementById('positionSize').value = config.position_size || 1;
+                        document.getElementById('stopLossPercent').value = config.stop_loss_percent || 2;
+                        document.getElementById('takeProfitPercent').value = config.take_profit_percent || 4;
+                        document.getElementById('maxDailyTrades').value = config.max_daily_trades || 10;
+                        document.getElementById('newsConfidenceThreshold').value = config.news_confidence_threshold || 0.7;
+                        document.getElementById('newsUpdateInterval').value = config.news_update_interval || 5;
+                        document.getElementById('enableNewsTrading').value = config.enable_news_trading ? 'true' : 'false';
+                        document.getElementById('newsWeight').value = config.news_weight || 0.3;
+                        document.getElementById('tradingStartTime').value = config.trading_start_time || '09:00';
+                        document.getElementById('tradingEndTime').value = config.trading_end_time || '17:00';
+                        document.getElementById('enableWeekendTrading').value = config.enable_weekend_trading ? 'true' : 'false';
+                        document.getElementById('tradingInterval').value = config.trading_interval || 10;
+                        document.getElementById('apiTimeout').value = config.api_timeout || 30;
+                        document.getElementById('maxRetries').value = config.max_retries || 3;
+                        document.getElementById('logLevel').value = config.log_level || 'INFO';
+                        document.getElementById('enablePaperTrading').value = config.enable_paper_trading ? 'true' : 'false';
+                    }
+                })
+                .catch(error => {
+                    console.log('No existing configuration found, using defaults');
+                });
+        }
+
+        function saveConfig() {
+            const formData = new FormData(document.getElementById('configForm'));
+            const config = {};
+            
+            // Convert form data to object
+            for (let [key, value] of formData.entries()) {
+                // Convert string values to appropriate types
+                if (key.includes('percent') || key.includes('threshold') || key.includes('weight')) {
+                    config[key] = parseFloat(value);
+                } else if (key.includes('period') || key.includes('size') || key.includes('trades') || 
+                          key.includes('interval') || key.includes('timeout') || key.includes('retries')) {
+                    config[key] = parseInt(value);
+                } else if (key.includes('enable') || (key.includes('trading') && !key.includes('time') && !key.includes('symbol'))) {
+                    config[key] = value === 'true';
+                } else {
+                    config[key] = value;
+                }
+            }
+
+            fetch('/api/config', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(config)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showConfigStatus('Configuration saved successfully!', 'success');
+                    addLogEntry('Trading configuration updated', 'success');
+                } else {
+                    showConfigStatus(`Failed to save configuration: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                showConfigStatus(`Error saving configuration: ${error}`, 'error');
+            });
+        }
+
+        function resetConfig() {
+            if (confirm('Are you sure you want to reset all configuration to default values?')) {
+                // Reset to default values
+                document.getElementById('apiKey').value = '';
+                document.getElementById('apiSecret').value = '';
+                document.getElementById('tradingSymbol').value = 'BTCUSD';
+                document.getElementById('smaShortPeriod').value = 9;
+                document.getElementById('smaLongPeriod').value = 21;
+                document.getElementById('emaShortPeriod').value = 9;
+                document.getElementById('emaLongPeriod').value = 21;
+                document.getElementById('positionSize').value = 1;
+                document.getElementById('stopLossPercent').value = 2;
+                document.getElementById('takeProfitPercent').value = 4;
+                document.getElementById('maxDailyTrades').value = 10;
+                document.getElementById('newsConfidenceThreshold').value = 0.7;
+                document.getElementById('newsUpdateInterval').value = 5;
+                document.getElementById('enableNewsTrading').value = 'true';
+                document.getElementById('newsWeight').value = 0.3;
+                document.getElementById('tradingStartTime').value = '09:00';
+                document.getElementById('tradingEndTime').value = '17:00';
+                document.getElementById('enableWeekendTrading').value = 'false';
+                document.getElementById('tradingInterval').value = 10;
+                document.getElementById('apiTimeout').value = 30;
+                document.getElementById('maxRetries').value = 3;
+                document.getElementById('logLevel').value = 'INFO';
+                document.getElementById('enablePaperTrading').value = 'false';
+                
+                showConfigStatus('Configuration reset to defaults', 'success');
+            }
+        }
+
+        // Close modal when clicking outside of it
+        window.onclick = function(event) {
+            const modal = document.getElementById('configModal');
+            if (event.target === modal) {
+                closeConfigModal();
+            }
+        }
+
+        // WebSocket connection
+        const socket = io();
+        
+        // Chart setup
+        const ctx = document.getElementById('priceChart').getContext('2d');
+        const priceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Price',
+                    data: [],
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: false
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+
+        // WebSocket event handlers
+        socket.on('status_update', function(data) {
+            updateDashboard(data);
+        });
+
+        socket.on('trade_executed', function(data) {
+            addLogEntry(`Trade executed: ${data.signal.toUpperCase()} at $${data.price}`, 'success');
+        });
+
+        socket.on('bot_error', function(data) {
+            addLogEntry(`Bot error: ${data.error}`, 'error');
+        });
+
+        socket.on('bot_stopped', function() {
+            addLogEntry('NEURAL BOT DEACTIVATED', 'warning');
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('botStatus').textContent = 'OFFLINE';
+            document.getElementById('botStatus').className = 'status-value stopped';
+        });
+
+        socket.on('news_update', function(data) {
+            updateNewsDisplay(data);
+        });
+
+        socket.on('news_error', function(data) {
+            addLogEntry(`News service error: ${data.error}`, 'error');
+        });
+
+        function updateDashboard(data) {
+            // Update status cards
+            document.getElementById('botStatus').textContent = data.running ? 'ONLINE' : 'OFFLINE';
+            document.getElementById('botStatus').className = `status-value ${data.running ? 'running' : 'stopped'}`;
+            
+            document.getElementById('currentPrice').textContent = `$${data.current_price ? data.current_price.toFixed(2) : '0.00'}`;
+            
+            if (data.position) {
+                document.getElementById('position').textContent = `${data.position.side.toUpperCase()} ${data.position.size}`;
+                document.getElementById('positionInfo').style.display = 'block';
+                document.getElementById('positionSide').textContent = data.position.side.toUpperCase();
+                document.getElementById('positionSize').textContent = data.position.size;
+                document.getElementById('entryPrice').textContent = `$${data.position.entry_price.toFixed(2)}`;
+                document.getElementById('realizedPnl').textContent = `$${data.position.realized_pnl.toFixed(2)}`;
+                document.getElementById('unrealizedPnl').textContent = `$${data.position.unrealized_pnl.toFixed(2)}`;
+                document.getElementById('totalPnl').textContent = `$${data.position.total_pnl.toFixed(2)}`;
+            } else {
+                document.getElementById('position').textContent = 'NONE';
+                document.getElementById('positionInfo').style.display = 'none';
+            }
+            
+            document.getElementById('pnl').textContent = `$${data.pnl ? data.pnl.toFixed(2) : '0.00'}`;
+            
+            // Update signals
+            updateSignal('smaSignal', data.signals.sma_signal);
+            updateSignal('emaSignal', data.signals.ema_signal);
+            
+            document.getElementById('smaShort').textContent = data.signals.sma_short ? data.signals.sma_short.toFixed(2) : '-';
+            document.getElementById('smaLong').textContent = data.signals.sma_long ? data.signals.sma_long.toFixed(2) : '-';
+            document.getElementById('emaShort').textContent = data.signals.ema_short ? data.signals.ema_short.toFixed(2) : '-';
+            document.getElementById('emaLong').textContent = data.signals.ema_long ? data.signals.ema_long.toFixed(2) : '-';
+            
+            // Update chart
+            if (data.current_price) {
+                const now = new Date().toLocaleTimeString();
+                priceChart.data.labels.push(now);
+                priceChart.data.datasets[0].data.push(data.current_price);
+                
+                // Keep only last 20 data points
+                if (priceChart.data.labels.length > 20) {
+                    priceChart.data.labels.shift();
+                    priceChart.data.datasets[0].data.shift();
+                }
+                
+                priceChart.update('none');
+            }
+        }
+
+        function updateSignal(elementId, signal) {
+            const element = document.getElementById(elementId);
+            const indicator = element.previousElementSibling;
+            
+            element.textContent = signal ? signal.toUpperCase() : 'NONE';
+            
+            if (signal === 'buy') {
+                indicator.className = 'signal-indicator signal-buy';
+            } else if (signal === 'sell') {
+                indicator.className = 'signal-indicator signal-sell';
+            } else {
+                indicator.className = 'signal-indicator signal-neutral';
+            }
+        }
+
+        function startBot() {
+            fetch('/api/start', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    addLogEntry('NEURAL BOT ACTIVATED SUCCESSFULLY', 'success');
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+                } else {
+                    addLogEntry(`NEURAL BOT ACTIVATION FAILED: ${data.message}`, 'error');
+                    if (data.message.includes('API credentials not configured')) {
+                        addLogEntry('INITIALIZE NEURAL ACCESS CREDENTIALS IN SYSTEM CONFIGURATION (⚙️)', 'error');
+                    }
+                }
+            })
+            .catch(error => {
+                addLogEntry(`Error starting bot: ${error}`, 'error');
+            });
+        }
+
+        function stopBot() {
+            fetch('/api/stop', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    addLogEntry('NEURAL BOT DEACTIVATED SUCCESSFULLY', 'warning');
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('stopBtn').disabled = true;
+                } else {
+                    addLogEntry(`NEURAL BOT DEACTIVATION FAILED: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                addLogEntry(`Error stopping bot: ${error}`, 'error');
+            });
+        }
+
+        function manualTrade(side) {
+            fetch('/api/manual-trade', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    side: side,
+                    size: 1
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const alertDiv = document.getElementById('manualTradeAlert');
+                if (data.success) {
+                    alertDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+                    addLogEntry(`Manual ${side} order executed`, 'success');
+                } else {
+                    alertDiv.innerHTML = `<div class="alert alert-error">${data.message}</div>`;
+                    addLogEntry(`Manual ${side} failed: ${data.message}`, 'error');
+                }
+                setTimeout(() => {
+                    alertDiv.innerHTML = '';
+                }, 3000);
+            })
+            .catch(error => {
+                addLogEntry(`Error executing manual trade: ${error}`, 'error');
+            });
+        }
+
+        function closePosition() {
+            fetch('/api/close-position', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const alertDiv = document.getElementById('manualTradeAlert');
+                if (data.success) {
+                    alertDiv.innerHTML = `<div class="alert alert-success">${data.message}</div>`;
+                    addLogEntry('Position closed manually', 'success');
+                } else {
+                    alertDiv.innerHTML = `<div class="alert alert-error">${data.message}</div>`;
+                    addLogEntry(`Failed to close position: ${data.message}`, 'error');
+                }
+                setTimeout(() => {
+                    alertDiv.innerHTML = '';
+                }, 3000);
+            })
+            .catch(error => {
+                addLogEntry(`Error closing position: ${error}`, 'error');
+            });
+        }
+
+        function addLogEntry(message, type = 'info') {
+            const log = document.getElementById('tradingLog');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        function startNews() {
+            fetch('/api/start-news', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    addLogEntry('NEURAL NEWS PROCESSOR ACTIVATED', 'success');
+                    document.getElementById('startNewsBtn').disabled = true;
+                    document.getElementById('stopNewsBtn').disabled = false;
+                    document.getElementById('newsStatus').textContent = 'NEURAL NEWS PROCESSOR: ONLINE';
+                    document.getElementById('newsStatus').style.background = 'rgba(0, 255, 0, 0.2)';
+                    document.getElementById('newsStatus').style.color = '#00ff00';
+                } else {
+                    addLogEntry(`NEURAL NEWS PROCESSOR ACTIVATION FAILED: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                addLogEntry(`Error starting news service: ${error}`, 'error');
+            });
+        }
+
+        function stopNews() {
+            fetch('/api/stop-news', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    addLogEntry('NEURAL NEWS PROCESSOR DEACTIVATED', 'warning');
+                    document.getElementById('startNewsBtn').disabled = false;
+                    document.getElementById('stopNewsBtn').disabled = true;
+                    document.getElementById('newsStatus').textContent = 'NEURAL NEWS PROCESSOR: OFFLINE';
+                    document.getElementById('newsStatus').style.background = 'rgba(255, 0, 64, 0.2)';
+                    document.getElementById('newsStatus').style.color = '#ff0040';
+                } else {
+                    addLogEntry(`NEURAL NEWS PROCESSOR DEACTIVATION FAILED: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                addLogEntry(`Error stopping news service: ${error}`, 'error');
+            });
+        }
+
+        function updateNewsDisplay(data) {
+            // Update news recommendation
+            if (data.recommendation) {
+                const recommendation = data.recommendation;
+                const signalElement = document.getElementById('recommendationSignal');
+                const confidenceElement = document.getElementById('recommendationConfidence');
+                const reasonElement = document.getElementById('recommendationReason');
+                
+                signalElement.textContent = recommendation.recommendation || 'HOLD';
+                signalElement.className = `recommendation-signal ${(recommendation.recommendation || 'hold').toLowerCase()}`;
+                
+                const confidence = Math.round((recommendation.overall_confidence || 0.5) * 100);
+                confidenceElement.textContent = `${confidence}%`;
+                
+                reasonElement.textContent = recommendation.reason || 'Based on recent market analysis';
+                
+                document.getElementById('newsRecommendation').style.display = 'block';
+            }
+
+            // Update news articles
+            const newsList = document.getElementById('newsList');
+            if (data.articles && data.articles.length > 0) {
+                newsList.innerHTML = '';
+                
+                data.articles.slice(0, 5).forEach(article => {
+                    const newsItem = document.createElement('div');
+                    newsItem.className = 'news-item';
+                    
+                    const timeAgo = new Date(article.published).toLocaleString();
+                    
+                    newsItem.innerHTML = `
+                        <div class="news-title">${article.title}</div>
+                        <div class="news-source">Source: ${article.source.toUpperCase()}</div>
+                        <div class="news-content">${article.content.substring(0, 150)}...</div>
+                        <div class="news-meta">
+                            <span>${timeAgo}</span>
+                            <a href="${article.url}" target="_blank" style="color: #667eea; text-decoration: none;">Read More →</a>
+                        </div>
+                    `;
+                    
+                    newsList.appendChild(newsItem);
+                });
+            }
+
+            // Update trading signals
+            const signalsList = document.getElementById('signalsList');
+            if (data.signals && data.signals.length > 0) {
+                signalsList.innerHTML = '';
+                
+                data.signals.forEach(signalData => {
+                    const signalItem = document.createElement('div');
+                    signalItem.className = 'signal-item';
+                    
+                    const signal = signalData.signal;
+                    const news = signalData.news;
+                    const confidence = Math.round(signal.confidence * 100);
+                    
+                    let confidenceClass = 'confidence-low';
+                    if (confidence >= 80) confidenceClass = 'confidence-high';
+                    else if (confidence >= 65) confidenceClass = 'confidence-medium';
+                    
+                    const tags = [];
+                    if (signal.crypto_mentions && signal.crypto_mentions.length > 0) {
+                        tags.push(...signal.crypto_mentions.map(crypto => `<span class="signal-tag">${crypto}</span>`));
+                    }
+                    if (signal.bullish_words && signal.bullish_words.length > 0) {
+                        tags.push(`<span class="signal-tag bullish">Bullish: ${signal.bullish_words.slice(0, 2).join(', ')}</span>`);
+                    }
+                    if (signal.bearish_words && signal.bearish_words.length > 0) {
+                        tags.push(`<span class="signal-tag bearish">Bearish: ${signal.bearish_words.slice(0, 2).join(', ')}</span>`);
+                    }
+                    if (signal.high_impact_keywords && signal.high_impact_keywords.length > 0) {
+                        tags.push(`<span class="signal-tag high-impact">High Impact: ${signal.high_impact_keywords.slice(0, 2).join(', ')}</span>`);
+                    }
+                    
+                    signalItem.innerHTML = `
+                        <div class="news-title">${news.title}</div>
+                        <div class="news-source">Source: ${news.source.toUpperCase()} | Signal: ${signal.signal}</div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin: 10px 0;">
+                            <span class="signal-confidence ${confidenceClass}">${confidence}% Confidence</span>
+                            <span style="font-size: 0.8rem; color: #a0aec0;">${new Date(news.published).toLocaleString()}</span>
+                        </div>
+                        <div class="signal-tags">${tags.join('')}</div>
+                    `;
+                    
+                    signalsList.appendChild(signalItem);
+                });
+            } else {
+                signalsList.innerHTML = '<p class="no-signals">No high-confidence signals available. Start the news service to analyze market sentiment.</p>';
+            }
+
+            // Update last refresh time
+            const refreshTime = document.createElement('div');
+            refreshTime.className = 'news-refresh';
+            refreshTime.textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+            newsList.appendChild(refreshTime);
+        }
+
+        // Initialize dashboard
+        fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+                updateDashboard(data);
+            });
+
+        // Initialize news data
+        fetch('/api/news')
+            .then(response => response.json())
+            .then(data => {
+                if (data.articles && data.articles.length > 0) {
+                    updateNewsDisplay(data);
+                }
+            })
+            .catch(error => {
+                console.log('No news data available yet');
+            });
+    </script>
+</body>
+</html>
